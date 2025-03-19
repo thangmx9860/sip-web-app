@@ -1,5 +1,10 @@
 import JsSIP from 'jssip';
 
+// Global audio element for remote stream
+const remoteAudio = new window.Audio();
+remoteAudio.autoplay = true;
+remoteAudio.crossOrigin = "anonymous";
+
 export class SipClient {
   constructor(username, password, domain) {
     this.username = username;
@@ -10,13 +15,16 @@ export class SipClient {
   }
 
   start(onIncomingCall) {
-    const socket = new JsSIP.WebSocketInterface('wss://portal.voip.namisense.ai:7443');
+    const socket = new JsSIP.WebSocketInterface('wss://softswitch.vbmiddleware.namisense.ai:7443');
     const configuration = {
       sockets: [socket],
       uri: `sip:${this.username}@${this.domain}`,
       password: this.password,
       display_name: this.username,
       register: true,
+      contact_uri: new JsSIP.URI("sip", this.username, this.domain, null, {
+        transport: "wss"
+      }).toString(),
       stun_servers: ['stun:stun.l.google.com:19302'],
     };
 
@@ -32,10 +40,15 @@ export class SipClient {
     this.ua.on('disconnected', (e) => console.error('WebSocket disconnected:', e));
     this.ua.on('registered', () => console.log('Registered successfully'));
     this.ua.on('registrationFailed', (e) => console.error('Registration failed:', e.cause));
+    this.ua.on('registrationExpiring', () => {
+      console.log('Registration expiring, re-registering...');
+      this.ua.register();
+    });
     this.ua.on('newRTCSession', (data) => {
       if (data.originator === 'remote') {
         console.log('Incoming call from:', data.session.remote_identity.uri);
         this.session = data.session;
+        this.setupAudio(this.session);
         onIncomingCall(this.session);
       }
     });
@@ -71,14 +84,63 @@ export class SipClient {
     console.log('Making call to:', targetUri);
     this.session = this.ua.call(targetUri, {
       mediaConstraints: { audio: true, video: false },
+      rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
     });
+    
+    this.setupAudio(this.session);
     return this.session;
+  }
+
+  setupAudio(session) {
+    session.on('peerconnection', (data) => {
+      const pc = data.peerconnection;
+      pc.onaddstream = (e) => {
+        console.log('Received remote audio stream:', e.stream);
+        remoteAudio.srcObject = e.stream;
+        console.log('Remote audio attached to audio element');
+      };
+      pc.ontrack = (event) => {
+        console.log('Received remote audio track:', event.track);
+        remoteAudio.srcObject = event.streams[0];
+      };
+      pc.getSenders().forEach((sender) => {
+        if (sender.track && sender.track.kind === 'audio') {
+          console.log('Local audio stream active, sending to PBX');
+        }
+      });
+      pc.getReceivers().forEach((receiver) => {
+        if (receiver.track && receiver.track.kind === 'audio') {
+          console.log('Remote audio receiver active:', receiver.track);
+        }
+      });
+    });
+
+    session.connection?.addEventListener('addstream', (e) => {
+      console.log('Fallback: Attached remote stream via connection.addstream');
+      remoteAudio.srcObject = e.stream;
+    });
+  }
+
+  unregister() {
+    if (this.ua && this.ua.isRegistered()) {
+      console.log('Sending UNREGISTER request to PBX');
+      this.ua.unregister();
+      return new Promise((resolve) => {
+        this.ua.on('unregistered', () => {
+          console.log('Successfully unregistered from PBX');
+          resolve();
+        });
+      });
+    }
+    console.log('Not registered, no UNREGISTER needed');
+    return Promise.resolve();
   }
 
   stop() {
     if (this.ua) {
       this.ua.stop();
       console.log('JsSIP client stopped');
+      remoteAudio.srcObject = null; // Clear audio on stop
     }
   }
 }

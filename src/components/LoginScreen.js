@@ -23,18 +23,25 @@ const LoginScreen = ({ setSipConfig }) => {
 
     try {
       console.log('Starting JsSIP client...');
-      client.start((session) => {
-        console.log('Incoming call detected, navigating to incoming-call screen');
-        setSipConfig({ client, session });
-        navigate('/incoming-call');
+      await new Promise((resolve, reject) => {
+        client.start((session) => {
+          console.log('Incoming call detected, navigating to incoming-call screen');
+          setSipConfig({ client, session });
+          navigate('/incoming-call');
+        });
+        client.ua.on('registered', () => {
+          console.log('Registration completed successfully');
+          resolve();
+        });
+        client.ua.on('registrationFailed', (e) => {
+          console.error('Registration failed:', e.cause);
+          reject(new Error(`Registration failed: ${e.cause}`));
+        });
       });
 
-      console.log('Awaiting registration...');
-      await client.register();
-      console.log('Registration completed successfully');
-
-      console.log('Setting sipConfig...');
+      console.log('Setting sipConfig and saving credentials...');
       setSipConfig({ client });
+      localStorage.setItem('sipCredentials', JSON.stringify({ username, password, domain }));
 
       console.log('Navigating to call screen...');
       navigate('/call');

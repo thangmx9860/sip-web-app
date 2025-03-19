@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const CallScreen = ({ sipConfig }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -6,13 +7,18 @@ const CallScreen = ({ sipConfig }) => {
   const [callTimer, setCallTimer] = useState(0);
   const [muted, setMuted] = useState(false);
   const [session, setSession] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let interval;
     if (callActive) {
       interval = setInterval(() => setCallTimer((prev) => prev + 1), 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      const audioElement = document.querySelector('audio');
+      if (audioElement) audioElement.remove();
+    };
   }, [callActive]);
 
   const handleCall = () => {
@@ -24,7 +30,15 @@ const CallScreen = ({ sipConfig }) => {
     setSession(newSession);
     setCallActive(true);
 
-    newSession.on('accepted', () => console.log('Call accepted'));
+    newSession.on('accepted', () => {
+      console.log('Call accepted');
+      // Increase volume for outgoing call
+      const remoteAudio = document.querySelector('audio');
+      if (remoteAudio) {
+        remoteAudio.volume = 1.0; // Max volume (range: 0.0 to 1.0)
+        console.log('Outgoing call volume set to maximum');
+      }
+    });
     newSession.on('failed', (e) => {
       console.error('Call failed:', e.cause);
       setCallActive(false);
@@ -48,6 +62,16 @@ const CallScreen = ({ sipConfig }) => {
       if (muted) session.unmute({ audio: true });
       else session.mute({ audio: true });
       setMuted(!muted);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (sipConfig && sipConfig.client) {
+      await sipConfig.client.unregister();
+      sipConfig.client.stop();
+      localStorage.removeItem('sipCredentials');
+      console.log('Logged out, navigating to login screen');
+      navigate('/');
     }
   };
 
@@ -81,6 +105,9 @@ const CallScreen = ({ sipConfig }) => {
           <button onClick={handleHangup}>Hangup</button>
         </>
       )}
+      <button onClick={handleLogout} style={{ marginTop: '10px' }}>
+        Logout
+      </button>
     </div>
   );
 };
