@@ -3,9 +3,12 @@ import { BrowserRouter as Router, Route, Routes, useNavigate } from 'react-route
 import LoginScreen from './components/LoginScreen';
 import CallScreen from './components/CallScreen';
 import IncomingCallPopup from './components/IncomingCallPopup';
-import ActiveCallScreen from './components/ActiveCallScreen'; // Import the new component
+import ActiveCallScreen from './components/ActiveCallScreen';
 import { SipClient } from './sipClient';
 import './styles.css';
+
+// Tiền tố cố định
+const PREFIX = '/webphone';
 
 const App = () => {
   const [sipConfig, setSipConfig] = useState(null);
@@ -41,38 +44,26 @@ const App = () => {
         <Route path="/" element={<LoginScreen setSipConfig={setSipConfig} />} />
         <Route
           path="/call"
-          element={
-            sipConfig ? (
-              <CallScreen sipConfig={sipConfig} />
-            ) : (
-              <LoginScreen setSipConfig={setSipConfig} />
-            )
-          }
+          element={sipConfig ? <CallScreen sipConfig={sipConfig} /> : <LoginScreen setSipConfig={setSipConfig} />}
         />
         <Route
           path="/incoming-call"
-          element={
-            sipConfig ? (
-              <IncomingCallPopup sipConfig={sipConfig} />
-            ) : (
-              <LoginScreen setSipConfig={setSipConfig} />
-            )
-          }
+          element={sipConfig ? <IncomingCallPopup sipConfig={sipConfig} /> : <LoginScreen setSipConfig={setSipConfig} />}
         />
         <Route
           path="/active-call"
-          element={
-            sipConfig ? (
-              <ActiveCallScreen sipConfig={sipConfig} />
-            ) : (
-              <LoginScreen setSipConfig={setSipConfig} />
-            )
-          }
+          element={sipConfig ? <ActiveCallScreen sipConfig={sipConfig} /> : <LoginScreen setSipConfig={setSipConfig} />}
         />
       </Routes>
     </div>
   );
 };
+
+// const AppWrapper = () => (
+//   <Router basename={PREFIX}>
+//     <App />
+//   </Router>
+// );
 
 const AppWrapper = () => (
   <Router>

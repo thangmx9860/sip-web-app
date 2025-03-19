@@ -22,10 +22,8 @@ export class SipClient {
       password: this.password,
       display_name: this.username,
       register: true,
-      contact_uri: new JsSIP.URI("sip", this.username, this.domain, null, {
-        transport: "wss"
-      }).toString(),
-      stun_servers: ['stun:stun.l.google.com:19302'],
+      contact_uri: new JsSIP.URI("sip", this.username, this.domain, null, { transport: "wss" }).toString(),
+      stun_servers: ['stun:softswitch.vbmiddleware.namisense.ai:3478'], // Match working version
     };
 
     console.log('Starting JsSIP client with:', {
@@ -58,16 +56,12 @@ export class SipClient {
 
   register() {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Registration timed out after 15 seconds'));
-      }, 15000);
-
+      const timeout = setTimeout(() => reject(new Error('Registration timed out')), 15000);
       this.ua.on('registered', () => {
         console.log('Registration promise resolving...');
         clearTimeout(timeout);
         resolve('Registration successful');
       });
-
       this.ua.on('registrationFailed', (e) => {
         console.log('Registration promise rejecting...');
         clearTimeout(timeout);
@@ -77,16 +71,13 @@ export class SipClient {
   }
 
   makeCall(target) {
-    if (!this.ua || !this.ua.isRegistered()) {
-      throw new Error('Not registered');
-    }
+    if (!this.ua || !this.ua.isRegistered()) throw new Error('Not registered');
     const targetUri = `sip:${target}@${this.domain}`;
     console.log('Making call to:', targetUri);
     this.session = this.ua.call(targetUri, {
       mediaConstraints: { audio: true, video: false },
       rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
     });
-    
     this.setupAudio(this.session);
     return this.session;
   }
@@ -125,12 +116,10 @@ export class SipClient {
     if (this.ua && this.ua.isRegistered()) {
       console.log('Sending UNREGISTER request to PBX');
       this.ua.unregister();
-      return new Promise((resolve) => {
-        this.ua.on('unregistered', () => {
-          console.log('Successfully unregistered from PBX');
-          resolve();
-        });
-      });
+      return new Promise((resolve) => this.ua.on('unregistered', () => {
+        console.log('Successfully unregistered from PBX');
+        resolve();
+      }));
     }
     console.log('Not registered, no UNREGISTER needed');
     return Promise.resolve();
@@ -140,8 +129,12 @@ export class SipClient {
     if (this.ua) {
       this.ua.stop();
       console.log('JsSIP client stopped');
-      remoteAudio.srcObject = null; // Clear audio on stop
+      remoteAudio.srcObject = null;
     }
+  }
+
+  getSession() {
+    return this.session; // Keep for ActiveCallScreen compatibility
   }
 }
 

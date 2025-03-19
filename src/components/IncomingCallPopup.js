@@ -58,10 +58,10 @@ const IncomingCallPopup = ({ sipConfig }) => {
   const handleReject = () => {
     if (sipConfig.session) {
       sipConfig.session.terminate({
-        status_code: 604, // Updated to 604 as per your earlier request
-        reason_phrase: 'Does Not Exist Anywhere',
+        status_code: 603, // Updated to 604 as per your earlier request
+        reason_phrase: 'Call Reject',
       });
-      console.log('Call rejected with 604 Does Not Exist Anywhere');
+      console.log('Call rejected with 603 Call Reject');
       navigate('/call');
     }
   };

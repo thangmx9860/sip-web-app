@@ -1,68 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const CallScreen = ({ sipConfig }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [callActive, setCallActive] = useState(false);
-  const [callTimer, setCallTimer] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [session, setSession] = useState(null);
+  const [callStatus, setCallStatus] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
-
-  useEffect(() => {
-    let interval;
-    if (callActive) {
-      interval = setInterval(() => setCallTimer((prev) => prev + 1), 1000);
-    }
-    return () => {
-      clearInterval(interval);
-      const audioElement = document.querySelector('audio');
-      if (audioElement) audioElement.remove();
-    };
-  }, [callActive]);
 
   const handleCall = () => {
     if (!sipConfig || !sipConfig.client) {
-      console.error('SIP client not available');
+      console.error('SIP client not initialized');
       return;
     }
+
     const newSession = sipConfig.client.makeCall(phoneNumber);
-    setSession(newSession);
-    setCallActive(true);
+    setCallStatus('ringing');
+
+    newSession.on('progress', () => {
+      setCallStatus('ringing');
+      console.log('Call is ringing...');
+    });
 
     newSession.on('accepted', () => {
       console.log('Call accepted');
-      // Increase volume for outgoing call
-      const remoteAudio = document.querySelector('audio');
-      if (remoteAudio) {
-        remoteAudio.volume = 1.0; // Max volume (range: 0.0 to 1.0)
-        console.log('Outgoing call volume set to maximum');
-      }
+      setCallStatus('');
+      sipConfig.session = newSession;
+      navigate('/active-call');
     });
+
     newSession.on('failed', (e) => {
       console.error('Call failed:', e.cause);
-      setCallActive(false);
+      setCallStatus('failed');
+      setErrorMessage(`Call failed: ${e.cause}`);
+      setTimeout(() => {
+        setCallStatus('');
+        setErrorMessage('');
+      }, 1000);
     });
+
     newSession.on('ended', () => {
-      setCallActive(false);
-      setCallTimer(0);
+      setCallStatus('');
     });
-  };
-
-  const handleHangup = () => {
-    if (session) {
-      session.terminate();
-      setCallActive(false);
-      setCallTimer(0);
-    }
-  };
-
-  const toggleMute = () => {
-    if (session) {
-      if (muted) session.unmute({ audio: true });
-      else session.mute({ audio: true });
-      setMuted(!muted);
-    }
   };
 
   const handleLogout = async () => {
@@ -70,17 +48,15 @@ const CallScreen = ({ sipConfig }) => {
       await sipConfig.client.unregister();
       sipConfig.client.stop();
       localStorage.removeItem('sipCredentials');
-      console.log('Logged out, navigating to login screen');
       navigate('/');
     }
   };
 
-  if (!sipConfig || !sipConfig.client) {
-    return <div>Please log in to make calls.</div>;
-  }
+  if (!sipConfig || !sipConfig.client) return <div>Please log in to make calls.</div>;
 
   return (
     <div className="call-container">
+      <img src={process.env.REACT_APP_LOGO_URL || '/default-logo.png'} alt="Company Logo" className="logo" />
       <h2>Make a Call</h2>
       <input
         type="text"
@@ -95,19 +71,12 @@ const CallScreen = ({ sipConfig }) => {
           </button>
         ))}
       </div>
-      <button onClick={handleCall} disabled={callActive}>
+      <button onClick={handleCall} disabled={callStatus === 'ringing'}>
         Call
       </button>
-      {callActive && (
-        <>
-          <p>Call Duration: {Math.floor(callTimer / 60)}:{callTimer % 60}</p>
-          <button onClick={toggleMute}>{muted ? 'Unmute' : 'Mute'}</button>
-          <button onClick={handleHangup}>Hangup</button>
-        </>
-      )}
-      <button onClick={handleLogout} style={{ marginTop: '10px' }}>
-        Logout
-      </button>
+      {callStatus === 'ringing' && <p className="status">Ringing...</p>}
+      {callStatus === 'failed' && <div className="error-popup">{errorMessage}</div>}
+      <button onClick={handleLogout} className="logout-btn">Logout</button>
     </div>
   );
 };

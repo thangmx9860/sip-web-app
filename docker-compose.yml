@@ -1,0 +1,7 @@
+services:
+  webphone-app:
+    image: webphone-app
+    container_name: webphone-app
+    restart: unless-stopped
+    ports:
+      - 3002:3000

@@ -5,18 +5,18 @@ import { SipClient } from '../sipClient';
 const LoginScreen = ({ setSipConfig }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [domain, setDomain] = useState('');
+  // const [domain, setDomain] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-
+  const domain = "voip.namisense.ai";
   const handleLogin = async () => {
     setError('');
-    if (!username || !password || !domain) {
+    // if (!username || !password || !domain) {
+    if (!username || !password) {
       setError('All fields are required.');
       console.log('Validation failed: missing fields');
       return;
     }
-
     console.log('Starting login process with:', { username, domain });
 
     const client = new SipClient(username, password, domain);
@@ -67,12 +67,12 @@ const LoginScreen = ({ setSipConfig }) => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <input
+      {/* <input
         type="text"
         placeholder="Domain"
         value={domain}
         onChange={(e) => setDomain(e.target.value)}
-      />
+      /> */}
       <button onClick={handleLogin}>Login</button>
       {error && <p className="error">{error}</p>}
     </div>

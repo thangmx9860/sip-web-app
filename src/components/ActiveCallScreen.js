@@ -3,26 +3,22 @@ import { useNavigate } from 'react-router-dom';
 
 const ActiveCallScreen = ({ sipConfig }) => {
   const navigate = useNavigate();
+  const session = sipConfig?.client?.getSession();
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const session = sipConfig?.session;
 
   useEffect(() => {
     if (!session) {
-      navigate('/call'); // Redirect if no session
+      navigate('/call');
       return;
     }
 
-    // Start timer when call is accepted
-    const timer = setInterval(() => {
-      setCallDuration((prev) => prev + 1);
-    }, 1000);
+    const timer = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
 
-    // Handle call end
     const handleCallEnded = () => {
       console.log('Call ended');
       clearInterval(timer);
-      navigate('/call');
+      setTimeout(() => navigate('/call'), 1000);
     };
 
     session.on('ended', handleCallEnded);
@@ -37,27 +33,15 @@ const ActiveCallScreen = ({ sipConfig }) => {
 
   const toggleMute = () => {
     if (session) {
-      if (isMuted) {
-        session.unmute({ audio: true });
-        console.log('Unmuted call');
-      } else {
-        session.mute({ audio: true });
-        console.log('Muted call');
-      }
+      if (isMuted) session.unmute({ audio: true });
+      else session.mute({ audio: true });
       setIsMuted(!isMuted);
     }
   };
 
   const handleHangup = () => {
-    if (session) {
-      session.terminate();
-      console.log('Call terminated by user');
-    }
+    if (session) session.terminate();
   };
-
-  if (!session) {
-    return null;
-  }
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -65,14 +49,21 @@ const ActiveCallScreen = ({ sipConfig }) => {
     return `${mins}:${secs < 10 ? '0' + secs : secs}`;
   };
 
+  if (!session) return null;
+
   return (
     <div className="active-call-screen">
+      <img src={process.env.REACT_APP_LOGO_URL || '/default-logo.png'} alt="Company Logo" className="logo" />
       <h2>Active Call</h2>
-      <p>Caller: {session.remote_identity.uri.toString()}</p>
-      <p>Callee: {session.local_identity.uri.toString()}</p>
+      <p>Calling: {session.remote_identity.uri.toString()}</p>
       <p>Duration: {formatDuration(callDuration)}</p>
-      <button onClick={toggleMute}>{isMuted ? 'Unmute' : 'Mute'}</button>
-      <button onClick={handleHangup}>Hang Up</button>
+      <div className="call-controls">
+        <button onClick={toggleMute} className={isMuted ? 'muted' : ''}>
+          {isMuted ? 'Unmute' : 'Mute'}
+        </button>
+        <button onClick={handleHangup} className="hangup-btn">Hang Up</button>
+      </div>
+      <audio id="remote-audio" autoPlay />
     </div>
   );
 };
